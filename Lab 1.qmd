@@ -1,0 +1,381 @@
+---
+title: "Lab 1"
+author: "Dominic Wooldridge"
+date: today
+execute:
+    warning: false
+    message: false
+format:
+  html:
+    theme: darkly
+    toc: true
+    code-fold: true
+    embed-resources: true
+---
+
+
+# Task 1
+
+
+*1.1:* 
+
+In the bubble chart, the aesthetics are set to:
+
+x = income per person
+
+y = life expectancy
+
+size = population
+
+color = world region
+
+*1.2:*
+
+```{python}
+import pandas as pd
+q1 = pd.read_csv("C:/Users/Owner/Downloads/MSBA RStudio/GSB S544/Lab 1/q1data.csv")
+q1
+```
+
+*1.3:*
+
+```{python}
+
+q1_clean = q1.copy()
+q1_clean['income'] = pd.to_numeric(q1_clean['income'], errors='coerce')
+q1_clean = q1_clean.query('income > 0')                              
+q1_clean = q1_clean.dropna(subset=['life_exp','population','four_regions'])
+q1_clean['four_regions'] = q1_clean['four_regions'].astype('category')
+q1_clean
+```
+
+
+```{python}
+import numpy as np
+from mizani.formatters import comma_format
+from plotnine import (
+    ggplot, aes, geom_point, annotate, labs, theme_minimal, theme,
+    scale_x_log10, scale_size_area, scale_fill_manual, guides
+)
+from plotnine.guides import guide_legend
+
+# region colors
+gap_colors = {'africa':'#00B5C4','americas':'#EF5A5A','asia':'#FFD23F','europe':'#C67AD9'}
+
+x_breaks = [1e3, 2e3, 5e3, 1e4, 2e4, 5e4, 1e5]
+
+p = (
+    ggplot(q1_clean, aes(x='income', y='life_exp', size='population', fill='four_regions'))
+    + annotate('text',
+               x=np.sqrt(q1_clean['income'].min()*q1_clean['income'].max()),
+               y=(q1_clean['life_exp'].min()+q1_clean['life_exp'].max())/2,
+               label='2010', size=70, alpha=0.08, color='#4d4d4d')
+    + geom_point(alpha=0.85, color='white', stroke=0.35)
+    + scale_x_log10(breaks=x_breaks, labels=comma_format())
+    + scale_size_area(max_size=16, breaks=[5e7, 1e9], labels=['50M','1B'], guide='legend')
+    + scale_fill_manual(values=gap_colors)
+    + labs(x='Income per person (GDP per capita, PPP)',
+           y='Life Expectancy (years)', fill='Region', size='Population')
+    + guides(
+        size=guide_legend(order=1,
+                          override_aes={'fill':'#9aa4b2','color':'#9aa4b2','alpha':0.85,'stroke':0.3}),
+        fill=guide_legend(order=2,
+                          override_aes={'size':5,'stroke':0.3,'color':'white'})
+    )
+    + theme_minimal(base_size=12)
+    + theme(figure_size=(9,6))
+)
+p
+
+```
+
+*1.4:*
+
+I used geom_bin2d to show a 2d density plot of where the data is located. Though this representation is informative, I feel that the bubble plot is a lot easier to interpret, mainly due to the color scale and separation of the observations.
+
+```{python}
+from plotnine import (
+    ggplot, aes, geom_bin2d, annotate, labs, theme_minimal, theme,
+    scale_x_log10, scale_fill_gradient
+)
+from mizani.breaks import log_breaks
+from mizani.formatters import comma_format
+import numpy as np
+
+df = q1_clean  
+
+p_alt = (
+    ggplot(df, aes(x='income', y='life_exp'))
+    + annotate('text',
+               x=np.sqrt(df['income'].min()*df['income'].max()),
+               y=(df['life_exp'].min()+df['life_exp'].max())/2,
+               label='2010', size=70, alpha=0.08, color='#4d4d4d')
+    + geom_bin2d(bins=30)
+    + scale_x_log10(breaks=log_breaks(n=6), labels=comma_format())
+    + scale_fill_gradient(low='#C0CEF0', high='#1450DB')  
+    + labs(x='Income per person',
+           y='Life Expectancy (years)',
+           fill='Countries (count)')
+    + theme_minimal() + theme(figure_size=(9,6))
+)
+
+p_alt
+
+```
+
+# Task 2
+
+*2.1:* 
+
+In the bubble chart, the aesthetics are set to:
+
+x = exports (% of GDP)
+
+y = imports (% of GDP)
+
+size = energy use
+
+color = world region
+
+
+*2.2:*
+
+```{python}
+q2 = pd.read_csv("C:/Users/Owner/Downloads/MSBA RStudio/GSB S544/Lab 1/q2data.csv")
+q2
+```
+
+*2.3:*
+
+```{python}
+
+q2c = q2.copy()
+for col in ['imports', 'exports', 'energy']:
+    q2c[col] = (
+        q2c[col]
+        .astype(str)
+        .str.replace('%', '', regex=False)
+        .str.replace(',', '', regex=False)
+    )
+    q2c[col] = pd.to_numeric(q2c[col], errors='coerce')
+
+q2c['four_regions'] = q2c['four_regions'].str.strip().str.lower()
+q2c = q2c.dropna(subset=['imports', 'exports', 'energy', 'four_regions'])
+
+q2c = q2c.query('exports > 0 and energy > 0')
+
+q2c['four_regions'] = q2c['four_regions'].astype('category')
+
+q2c
+```
+
+
+```{python}
+gap_colors = {'africa':'#00B5C4','americas':'#EF5A5A','asia':'#FFD23F','europe':'#C67AD9'}
+
+energy_brks = list(np.quantile(q2c['energy'], [0.25, 0.5, 0.75]))
+
+p = (
+    ggplot(q2c, aes(x='exports', y='imports', size='energy', fill='four_regions'))
+    + annotate('text',
+               x=np.sqrt(q2c['exports'].min()*q2c['exports'].max()),
+               y=(q2c['imports'].min()+q2c['imports'].max())/2,
+               label='1997', size=70, alpha=0.08, color='#4d4d4d')
+    + geom_point(alpha=0.85, color='white', stroke=0.35)
+    + scale_x_log10(breaks=[1, 2, 5, 10, 20, 50, 100],
+                    labels=lambda b: [f'{v:g}%' for v in b])
+    + scale_size_area(max_size=16, breaks=energy_brks,
+                      labels=[f'{int(x):,}' for x in energy_brks],
+                      guide='legend')
+    + scale_fill_manual(values=gap_colors)
+    + labs(x='Exports (% of GDP)', y='Imports (% of GDP)',
+           fill='Region', size='Energy use')
+    + guides(
+        size=guide_legend(order=1,
+                          override_aes={'fill':'#9aa4b2','color':'#9aa4b2','alpha':0.85,'stroke':0.3}),
+        fill=guide_legend(order=2,
+                          override_aes={'size':5,'stroke':0.3,'color':'white'})
+    )
+    + theme_minimal(base_size=12)
+    + theme(figure_size=(9,6))
+)
+
+p
+```
+
+*2.4:*
+
+For an alternative geometry, I chose geom_density_2d. This geometry is much less intuitive than the bubble plot. This plot is good at highlighting the overall pattern of the data, but the overlapping can be hard to interpret.
+
+```{python}
+
+from plotnine import (
+    ggplot, aes, geom_point, geom_density_2d, annotate, labs, theme_minimal, theme,
+    scale_x_log10, scale_y_continuous, scale_color_manual
+)
+from mizani.breaks import log_breaks
+import numpy as np
+
+gap_colors = {'africa':'#00B5C4','americas':'#EF5A5A','asia':'#FFD23F','europe':'#C67AD9'}
+
+p_alt = (
+    ggplot(q2c, aes(x='exports', y='imports'))
+    + annotate('text',
+               x=np.sqrt(q2c['exports'].min()*q2c['exports'].max()),
+               y=(q2c['imports'].min()+q2c['imports'].max())/2,
+               label='1997', size=70, alpha=0.08, color='#4d4d4d')
+    + geom_point(alpha=0.15, size=1.2, color='#bdbdbd')
+    + geom_density_2d(aes(color='four_regions'), size=0.6)
+    + scale_color_manual(values=gap_colors)
+    + scale_x_log10(breaks=log_breaks(n=6), labels=lambda b: [f'{v:g}%' for v in b])
+    + scale_y_continuous(labels=lambda b: [f'{v:g}%' for v in b])
+    + labs(x='Exports (% of GDP)', y='Imports (% of GDP)', color='Region')
+    + theme_minimal(base_size=12)
+    + theme(figure_size=(9,6))
+)
+
+p_alt
+```
+
+
+# Task 3
+
+*3.1:* 
+
+In the bubble chart, the aesthetics are set to:
+
+x = individuals using the internet
+
+y = GDP per capita
+
+size = income
+
+color = world region
+
+*3.2:* 
+
+```{python}
+q3 = pd.read_csv("C:/Users/Owner/Downloads/MSBA RStudio/GSB S544/Lab 1/q3data.csv")
+q3
+```
+
+*3.3:* 
+
+```{python}
+q3c = q3.copy()
+
+for col in ['internet_users', 'gdp', 'income']:
+    q3c[col] = (
+        q3c[col].astype(str)
+                 .str.replace('%','', regex=False)
+                 .str.replace(',','', regex=False)
+    )
+    q3c[col] = pd.to_numeric(q3c[col], errors='coerce')
+
+
+q3c['four_regions'] = q3c['four_regions'].astype(str).str.strip().str.lower()
+q3c = q3c.dropna(subset=['internet_users', 'gdp', 'income', 'four_regions'])
+
+q3c = q3c.query('gdp > 0 and income > 0 and internet_users >= 0')
+q3c = q3c[q3c['internet_users'] <= 100]  
+
+q3c['four_regions'] = q3c['four_regions'].astype('category')
+
+q3c
+```
+
+
+```{python}
+
+import numpy as np
+import pandas as pd
+from mizani.formatters import comma_format
+from plotnine import (
+    ggplot, aes, geom_point, annotate, labs, theme_minimal, theme,
+    scale_x_continuous, scale_y_log10, scale_size_area, scale_fill_manual, guides
+)
+from plotnine.guides import guide_legend
+
+gap_colors = {'africa':'#00B5C4','americas':'#EF5A5A','asia':'#FFD23F','europe':'#C67AD9'}
+q3p = (
+    q3c.dropna(subset=['internet_users','gdp','income','four_regions'])
+       .query('gdp > 0 and income > 0 and 0 <= internet_users <= 100')
+       .copy()
+)
+q3p['four_regions'] = q3p['four_regions'].str.lower()
+q3p = q3p[q3p['four_regions'].isin(gap_colors.keys())].copy()
+q3p['four_regions'] = q3p['four_regions'].astype('category')
+
+size_brks = list(np.quantile(q3p['income'], [0.25, 0.5, 0.75]))
+year_label = int(q3p['year'].mode().iat[0]) if 'year' in q3p.columns else ''
+
+p = (
+    ggplot(q3p, aes(x='internet_users', y='gdp', size='income', fill='four_regions'))
+    + annotate('text',
+               x=50,  
+               y=np.sqrt(q3p['gdp'].min() * q3p['gdp'].max()),
+               label=str(year_label), size=70, alpha=0.08, color='#4d4d4d')
+    + geom_point(alpha=0.85, color='white', stroke=0.35)
+    + scale_x_continuous(limits=(0, 100),
+                         breaks=[0,10,20,40,60,80,100],
+                         labels=lambda b: [f'{int(v)}%' for v in b])
+    + scale_y_log10(breaks=[500,1000,2000,4000,8000,16000,32000,64000],
+                    labels=comma_format())
+    + scale_size_area(max_size=16, breaks=size_brks,
+                      labels=[f'{int(x):,}' for x in size_brks], guide='legend')
+    + scale_fill_manual(values=gap_colors, breaks=list(gap_colors.keys()))
+    + labs(x='Individuals using the Internet (% of population)',
+           y='GDP per capita',
+           fill='Region', size='Income')
+    + guides(
+        size=guide_legend(order=1,
+                          override_aes={'fill':'#9aa4b2','color':'#9aa4b2','alpha':0.85,'stroke':0.3}),
+        fill=guide_legend(order=2,
+                          override_aes={'size':5,'stroke':0.3,'color':'white'})
+    )
+    + theme_minimal(base_size=12)
+    + theme(figure_size=(9,6))
+)
+
+p
+
+```
+
+
+*3.4:* 
+
+For my alternative plot, I chose geom_smooth and geom_rug. The overall trend is shown in the data, but individual observations are not observed. In general, this visualization lacks the insights that the bubble plot does.
+
+```{python}
+from plotnine import (
+    ggplot, aes, geom_smooth, geom_rug, annotate, labs, theme_minimal, theme,
+    scale_x_continuous, scale_y_log10, scale_color_manual
+)
+from mizani.formatters import comma_format
+import numpy as np
+
+gap_colors = {'africa':'#00B5C4','americas':'#EF5A5A','asia':'#FFD23F','europe':'#C67AD9'}
+
+p_alt = (
+    ggplot(q3p, aes(x='internet_users', y='gdp', color='four_regions', fill='four_regions'))
+    + annotate('text',
+               x=50,
+               y=np.sqrt(q3p['gdp'].min() * q3p['gdp'].max()),
+               label='2001', size=70, alpha=0.08, color='#4d4d4d')
+    + geom_smooth(method='lowess', se=True, span=0.6, size=1.1, alpha=0.15)
+    + geom_rug(sides='b', alpha=0.15, color='#999999')
+    + scale_x_continuous(limits=(0,100),
+                         breaks=[0,10,20,40,60,80,100],
+                         labels=lambda b: [f'{int(v)}%' for v in b])
+    + scale_y_log10(breaks=[500,1000,2000,4000,8000,16000,32000,64000],
+                    labels=comma_format())
+    + scale_color_manual(values=gap_colors)
+    + labs(x='Individuals using the Internet (% of population)',
+           y='GDP per capita (USD, log scale)',
+           color='Region')
+    + theme_minimal(base_size=12)
+    + theme(figure_size=(9,6))
+)
+p_alt
+
+```
